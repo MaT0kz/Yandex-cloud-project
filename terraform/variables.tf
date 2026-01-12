@@ -7,6 +7,7 @@ variable "cloud_config" {
   description = "Yandex Cloud configuration"
   type = object({
     folder_id              = string
+    service_account_id     = string
     region                 = string
     region_zone            = string
     token                  = string
@@ -14,6 +15,7 @@ variable "cloud_config" {
   })
   default = {
     folder_id              = "b1gxxxxxxxxxxxxx"
+    service_account_id     = "ajepq0p2v2c4s2h8v5g0"  # ID сервисного аккаунта admin
     region                 = "ru-central1"
     region_zone            = "ru-central1-a"
     token                  = ""
@@ -117,6 +119,7 @@ variable "container_config" {
   description = "Serverless Container configuration"
   type = object({
     image_url         = string
+    registry_id       = string
     cores             = number
     memory            = number
     core_fraction     = number
@@ -124,6 +127,7 @@ variable "container_config" {
   })
   default = {
     image_url         = ""
+    registry_id       = ""
     cores             = 1
     memory            = 256  # MB
     core_fraction     = 100

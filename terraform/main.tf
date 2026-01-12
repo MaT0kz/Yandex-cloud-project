@@ -61,18 +61,8 @@ resource "yandex_mdb_postgresql_cluster" "news_site_db" {
     }
   }
   
-  database {
-    name  = var.db_config.database_name
-    owner = var.db_config.username
-  }
-  
-  user {
-    name             = var.db_config.username
-    password         = var.db_config.password
-    permission {
-      database_name = var.db_config.database_name
-    }
-  }
+  # Удалён в пользу отдельного ресурса yandex_mdb_postgresql_user
+  # user { ... }
   
   host {
     zone       = var.cloud_config.region_zone
@@ -91,51 +81,61 @@ resource "yandex_mdb_postgresql_cluster" "news_site_db" {
   }
 }
 
-# ============================================
-# Service Account
-# ============================================
-
-# Сервисный аккаунт для проекта
-resource "yandex_iam_service_account" "news_site_sa" {
-  name        = "${var.project_name}-sa"
-  description = "Service account for news site infrastructure"
-  folder_id   = var.cloud_config.folder_id
+# Отдельный ресурс для БД (рекомендуемый подход)
+resource "yandex_mdb_postgresql_database" "news_site_database" {
+  cluster_id = yandex_mdb_postgresql_cluster.news_site_db.id
+  name       = var.db_config.database_name
+  owner      = var.db_config.username  # Создадим отдельного пользователя-владельца
+  
+  depends_on = [yandex_mdb_postgresql_user.news_site_user]
 }
+
+# Отдельный ресурс для пользователя (рекомендуемый подход)
+resource "yandex_mdb_postgresql_user" "news_site_user" {
+  cluster_id = yandex_mdb_postgresql_cluster.news_site_db.id
+  name       = var.db_config.username
+  password   = var.db_config.password
+  login      = true  # Разрешить логин
+}
+
+# ============================================
+# Service Account (используем существующий admin)
+# ============================================
 
 # Статические ключи доступа для сервисного аккаунта (используются для Message Queue)
 resource "yandex_iam_service_account_static_access_key" "sa_access_key" {
-  service_account_id = yandex_iam_service_account.news_site_sa.id
+  service_account_id = var.cloud_config.service_account_id
   description        = "Static access key for Message Queue"
 }
 resource "yandex_resourcemanager_folder_iam_member" "sa_storage_admin" {
   folder_id = var.cloud_config.folder_id
   role      = "storage.admin"
-  member    = "serviceAccount:${yandex_iam_service_account.news_site_sa.id}"
+  member    = "serviceAccount:${var.cloud_config.service_account_id}"
 }
   
 resource "yandex_resourcemanager_folder_iam_member" "sa_mq_admin" {
   folder_id = var.cloud_config.folder_id
   role      = "ymq.admin"
-  member    = "serviceAccount:${yandex_iam_service_account.news_site_sa.id}"
+  member    = "serviceAccount:${var.cloud_config.service_account_id}"
 }
 
 resource "yandex_resourcemanager_folder_iam_member" "sa_function_invoker" {
   folder_id = var.cloud_config.folder_id
   role      = "functions.functionInvoker"
-  member    = "serviceAccount:${yandex_iam_service_account.news_site_sa.id}"
+  member    = "serviceAccount:${var.cloud_config.service_account_id}"
 }
 
 resource "yandex_resourcemanager_folder_iam_member" "sa_container_invoker" {
   folder_id = var.cloud_config.folder_id
   role      = "serverless.containers.invoker"
-  member    = "serviceAccount:${yandex_iam_service_account.news_site_sa.id}"
+  member    = "serviceAccount:${var.cloud_config.service_account_id}"
 }
 
 # Право на чтение образов из Container Registry
 resource "yandex_resourcemanager_folder_iam_member" "sa_container_registry_viewer" {
   folder_id = var.cloud_config.folder_id
   role      = "container-registry.images.puller"
-  member    = "serviceAccount:${yandex_iam_service_account.news_site_sa.id}"
+  member    = "serviceAccount:${var.cloud_config.service_account_id}"
 }
 
 # ============================================
@@ -201,7 +201,7 @@ resource "yandex_function" "delete_image_function" {
   entrypoint         = var.function_config.entrypoint
   memory             = var.function_config.memory
   execution_timeout  = 10  # секунды (число, не строка!)
-  service_account_id = yandex_iam_service_account.news_site_sa.id
+  service_account_id = var.cloud_config.service_account_id
   
   # Подключение zip-архива с кодом функции
   content {
@@ -222,15 +222,15 @@ resource "yandex_function_trigger" "mq_trigger" {
   description = "Trigger for processing image deletion queue"
   
   message_queue {
-    queue_id           = yandex_message_queue.image_delete_queue.id
-    service_account_id = yandex_iam_service_account.news_site_sa.id
+    queue_id           = yandex_message_queue.image_delete_queue.arn
+    service_account_id = var.cloud_config.service_account_id
     batch_cutoff       = 10
     batch_size         = 10
   }
   
   function {
     id                 = yandex_function.delete_image_function.id
-    service_account_id = yandex_iam_service_account.news_site_sa.id
+    service_account_id = var.cloud_config.service_account_id
   }
 }
 
@@ -251,7 +251,14 @@ resource "yandex_serverless_container" "news_site_container" {
   cores           = var.container_config.cores
   core_fraction   = var.container_config.core_fraction
   execution_timeout = var.container_config.execution_timeout
-  service_account_id = yandex_iam_service_account.news_site_sa.id
+  service_account_id = var.cloud_config.service_account_id
+  
+  # Разрешить публичный доступ
+  invocation_protocol = "http"
+  visibility {
+    google = true
+    yandex = "all-users"
+  }
 }
 
 # ============================================
@@ -274,38 +281,53 @@ resource "yandex_api_gateway" "news_site_api" {
       "/" = {
         get = {
           x-yc-apigateway-integration = {
-            type        = "serverless_containers"
-            container_id = yandex_serverless_container.news_site_container.id
+            type            = "serverless_containers"
+            container_id    = yandex_serverless_container.news_site_container.id
+            service_account = var.cloud_config.service_account_id
           }
           operationId = "index"
         }
       }
       "/{proxy+}" = {
+        parameters = [
+          {
+            name = "proxy"
+            in   = "path"
+            required = true
+            schema = {
+              type = "string"
+            }
+          }
+        ]
         get = {
           x-yc-apigateway-integration = {
-            type        = "serverless_containers"
-            container_id = yandex_serverless_container.news_site_container.id
+            type            = "serverless_containers"
+            container_id    = yandex_serverless_container.news_site_container.id
+            service_account = var.cloud_config.service_account_id
           }
           operationId = "proxyGet"
         }
         post = {
           x-yc-apigateway-integration = {
-            type        = "serverless_containers"
-            container_id = yandex_serverless_container.news_site_container.id
+            type            = "serverless_containers"
+            container_id    = yandex_serverless_container.news_site_container.id
+            service_account = var.cloud_config.service_account_id
           }
           operationId = "proxyPost"
         }
         put = {
           x-yc-apigateway-integration = {
-            type        = "serverless_containers"
-            container_id = yandex_serverless_container.news_site_container.id
+            type            = "serverless_containers"
+            container_id    = yandex_serverless_container.news_site_container.id
+            service_account = var.cloud_config.service_account_id
           }
           operationId = "proxyPut"
         }
         delete = {
           x-yc-apigateway-integration = {
-            type        = "serverless_containers"
-            container_id = yandex_serverless_container.news_site_container.id
+            type            = "serverless_containers"
+            container_id    = yandex_serverless_container.news_site_container.id
+            service_account = var.cloud_config.service_account_id
           }
           operationId = "proxyDelete"
         }
@@ -385,7 +407,7 @@ output "api_gateway_domain" {
 
 output "service_account_id" {
   description = "Service Account ID"
-  value       = yandex_iam_service_account.news_site_sa.id
+  value       = var.cloud_config.service_account_id
 }
 
 output "service_account_access_key" {
