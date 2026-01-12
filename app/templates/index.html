@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Новостной сайт{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Последние новости</h1>
+    </div>
+</div>
+
+{% if news_list %}
+    <div class="row">
+        {% for news in news_list %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    {% if news.image_url %}
+                        <img src="{{ news.image_url }}" class="card-img-top news-image" alt="{{ news.title }}">
+                    {% else %}
+                        <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
+                            <span class="text-white">📰</span>
+                        </div>
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ news.title }}</h5>
+                        <p class="card-text text-muted">
+                            {{ news.content[:100] }}{% if news.content|length > 100 %}...{% endif %}
+                        </p>
+                        <small class="text-muted">
+                            {{ news.created_at.strftime('%d.%m.%Y %H:%M') }}
+                            {% if news.author %}
+                                | Автор: {{ news.author.username }}
+                            {% endif %}
+                        </small>
+                    </div>
+                    <div class="card-footer bg-white border-top-0">
+                        <a href="{{ url_for('view_news', news_id=news.id) }}" class="btn btn-primary btn-sm">
+                            Читать далее
+                        </a>
+                        {% if g.user and news.user_id == g.user.id %}
+                            <a href="{{ url_for('edit_news', news_id=news.id) }}" class="btn btn-outline-secondary btn-sm">
+                                Изменить
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info">
+        <h4>Новостей пока нет</h4>
+        <p>Будьте первым, кто добавит новость!</p>
+        <a href="{{ url_for('create_news') }}" class="btn btn-primary">Добавить новость</a>
+    </div>
+{% endif %}
+{% endblock %}

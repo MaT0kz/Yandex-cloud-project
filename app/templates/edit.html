@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Редактировать: {{ news.title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h4 class="mb-0">✏️ Редактировать новость</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Заголовок *</label>
+                        <input type="text" class="form-control" id="title" name="title" required
+                               value="{{ news.title }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Содержание *</label>
+                        <textarea class="form-control" id="content" name="content" rows="8" required>{{ news.content }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Изображение</label>
+                        {% if news.image_url %}
+                            <div class="mb-2">
+                                <img src="{{ news.image_url }}" alt="Текущее изображение" style="max-height: 150px; border-radius: 4px;">
+                                <p class="small text-muted mt-1">Текущее изображение</p>
+                            </div>
+                        {% endif %}
+                        <input type="file" class="form-control" id="image" name="image" 
+                               accept="image/*">
+                        <small class="text-muted">Загрузите новое изображение, чтобы заменить текущее</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            💾 Сохранить изменения
+                        </button>
+                        <a href="{{ url_for('view_news', news_id=news.id) }}" class="btn btn-secondary">
+                            ← Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

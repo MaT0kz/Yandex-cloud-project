@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:8080"
+    environment:
+      - FLASK_ENV=development
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=news_db
+      - DB_USER=news_user
+      - DB_PASSWORD=news_password
+      - SECRET_KEY=dev-secret-key-for-local-testing
+      - YANDEX_ACCESS_KEY_ID=${YANDEX_ACCESS_KEY_ID:-}
+      - YANDEX_SECRET_ACCESS_KEY=${YANDEX_SECRET_ACCESS_KEY:-}
+      - YANDEX_BUCKET_NAME=${YANDEX_BUCKET_NAME:-news-site-storage}
+      - YANDEX_ENDPOINT_URL=${YANDEX_ENDPOINT_URL:-https://storage.yandexcloud.net}
+      - YANDEX_REGION=${YANDEX_REGION:-ru-central1}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=news_db
+      - POSTGRES_USER=news_user
+      - POSTGRES_PASSWORD=news_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U news_user -d news_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

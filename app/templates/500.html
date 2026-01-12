@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Ошибка сервера{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+        <div class="card">
+            <div class="card-body py-5">
+                <h1 class="display-1 text-danger">500</h1>
+                <h2 class="mb-4">Ошибка сервера</h2>
+                <p class="text-muted">Произошла внутренняя ошибка сервера. Пожалуйста, попробуйте позже.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary mt-3">
+                    🏠 На главную
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

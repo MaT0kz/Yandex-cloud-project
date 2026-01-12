@@ -1,0 +1,76 @@
+# ============================================
+# Terraform Variables - Example Values
+# ============================================
+# Copy this file to terraform.tfvars and modify values
+
+# Cloud Configuration - REQUIRED
+cloud_config = {
+  folder_id     = "b1gxxxxxxxxxxxxx"  # Замените на ваш folder_id из Yandex Cloud
+  region        = "ru-central1"
+  region_zone   = "ru-central1-a"
+}
+
+# Project Configuration
+project_name = "news-site"
+
+# Database Configuration
+db_config = {
+  postgresql_version     = 15
+  environment            = "PRODUCTION"
+  resource_preset_id     = "s2.micro"  # Минимальный вариант для тестирования
+  disk_type_id           = "network-hdd"
+  disk_size              = 10          # ГБ
+  port                   = 6432
+  database_name          = "news_db"
+  username               = "news_user"
+  password               = "ChangeThisPassword123!"  # Измените на свой пароль
+  assign_public_ip       = false
+  maintenance_window_type = "WEEKLY"
+  maintenance_window_day = 1           # Понедельник
+  maintenance_window_hour = 12         # 12:00
+}
+
+# Storage Configuration
+storage_config = {
+  bucket_name          = "news-site-images-bucket"  # Уникальное имя бакета
+  max_size             = 1073741824  # 1 ГБ в байтах
+  cors_allowed_origins = ["*"]       # Для разработки; в продакшене укажите домен
+  versioning_enabled   = false
+  lifecycle_enabled    = true
+  expiration_days      = 30
+}
+
+# Message Queue Configuration
+mq_config = {
+  queue_name = "news-image-delete-queue"
+}
+
+# Cloud Function Configuration
+function_config = {
+  source_path      = ""  # Оставьте пустым для использования source_path в main.tf
+  runtime          = "python311"
+  entrypoint       = "index.handler"
+  memory           = 128  # МБ
+  execution_timeout = 10   # секунд
+}
+
+# Container Configuration
+container_config = {
+  image_url         = ""  # Будет заполнено после: cr.yandex/<folder-id>/news-site-container:latest
+  cores             = 1
+  memory            = 256  # МБ
+  core_fraction     = 100
+  execution_timeout = 15   # секунд
+}
+
+# Application Configuration
+app_config = {
+  secret_key = "ChangeThisSecretKeyAtLeast32Characters!"  # Измените на свой ключ
+}
+
+# Tags (optional)
+tags = {
+  project     = "news-site"
+  managed-by  = "terraform"
+  environment = "production"
+}

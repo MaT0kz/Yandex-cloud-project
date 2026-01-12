@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить новость{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">📝 Добавить новость</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Заголовок *</label>
+                        <input type="text" class="form-control" id="title" name="title" required
+                               placeholder="Введите заголовок новости">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Содержание *</label>
+                        <textarea class="form-control" id="content" name="content" rows="8" required
+                                  placeholder="Введите полный текст новости"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Изображение</label>
+                        <input type="file" class="form-control" id="image" name="image" 
+                               accept="image/*">
+                        <small class="text-muted">Загруженные изображения сохраняются в Yandex Object Storage</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            ✅ Опубликовать
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            ← Назад
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
