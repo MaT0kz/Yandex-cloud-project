@@ -399,5 +399,3 @@ output "service_account_secret_key" {
   value       = yandex_iam_service_account_static_access_key.sa_access_key.secret_key
   sensitive   = true
 }
-
-docker run -d -p 8080:8080 --name news-site-test news-site:latest

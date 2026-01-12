@@ -21,15 +21,11 @@ class Config:
     DB_USER = os.environ.get('DB_USER') or 'news_user'
     DB_PASSWORD = os.environ.get('DB_PASSWORD') or 'password'
     
-    # Use SQLite if DATABASE_URL contains 'sqlite', otherwise use PostgreSQL
     @staticmethod
     def get_db_url():
         database_url = os.environ.get('DATABASE_URL')
         if database_url:
             return database_url
-        use_sqlite = os.environ.get('USE_SQLITE', '').lower() in ('true', '1', 'yes')
-        if use_sqlite:
-            return 'sqlite:///news_site.db'
         return f"postgresql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}"
     
     # Yandex Object Storage settings
@@ -46,19 +42,9 @@ class Config:
     # Static files URL
     STATIC_FILES_URL = os.environ.get('STATIC_FILES_URL') or '/static/uploads'
 
-    # Check if S3 is configured
-    @staticmethod
-    def is_s3_configured():
-        return bool(Config.YANDEX_ACCESS_KEY_ID and Config.YANDEX_SECRET_ACCESS_KEY and Config.YANDEX_BUCKET_NAME)
-
-    # Check if SQS is configured
-    @staticmethod
-    def is_sqs_configured():
-        return bool(Config.YANDEX_SQS_QUEUE_URL)
-
 
 class DevelopmentConfig(Config):
-    """Development configuration - uses SQLite by default for local testing."""
+    """Development configuration."""
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = Config.get_db_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
