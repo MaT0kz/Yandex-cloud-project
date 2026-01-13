@@ -191,7 +191,7 @@ resource "yandex_storage_bucket" "news_site_pages" {
   folder_id = var.cloud_config.folder_id
   max_size  = var.storage_config.max_size
 
-  # Публичный доступ для чтения
+  # Публичный доступ для чтения (приложение будет скачивать файлы)
   anonymous_access_flags {
     read = true
     list = true
@@ -203,12 +203,6 @@ resource "yandex_storage_bucket" "news_site_pages" {
     allowed_methods = ["GET", "HEAD"]
     allowed_origins = var.storage_config.cors_allowed_origins
     max_age_seconds = 86400
-  }
-
-  # Веб-сайт хостинг
-  website {
-    index_file = "index.html"
-    error_file = "404.html"
   }
 }
 
@@ -501,11 +495,6 @@ output "static_pages_bucket_name" {
 }
 
 output "static_pages_bucket_url" {
-  description = "Static Pages bucket URL"
+  description = "Static Pages bucket URL (download templates from here)"
   value       = "https://storage.yandexcloud.net/${yandex_storage_bucket.news_site_pages.bucket}"
-}
-
-output "static_pages_website_url" {
-  description = "Static Pages website endpoint URL"
-  value       = yandex_storage_bucket.news_site_pages.website_endpoint
 }
