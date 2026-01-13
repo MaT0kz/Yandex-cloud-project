@@ -185,6 +185,33 @@ resource "yandex_storage_bucket" "news_site_images" {
   }
 }
 
+# Бакет для статических страниц (HTML-шаблоны)
+resource "yandex_storage_bucket" "news_site_pages" {
+  bucket    = var.storage_config.pages_bucket_name
+  folder_id = var.cloud_config.folder_id
+  max_size  = var.storage_config.max_size
+
+  # Публичный доступ для чтения
+  anonymous_access_flags {
+    read = true
+    list = true
+  }
+
+  # CORS для доступа к страницам
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "HEAD"]
+    allowed_origins = var.storage_config.cors_allowed_origins
+    max_age_seconds = 86400
+  }
+
+  # Веб-сайт хостинг
+  website {
+    index_file = "index.html"
+    error_file = "404.html"
+  }
+}
+
 # ============================================
 # Message Queue (Yandex Message Queue)
 # ============================================
@@ -273,6 +300,9 @@ resource "yandex_serverless_container" "news_site_container" {
       YANDEX_SQS_QUEUE_URL    = "https://message-queue.api.cloud.yandex.net/${var.cloud_config.folder_id}/${yandex_message_queue.image_delete_queue.name}"
       YANDEX_SQS_ACCESS_KEY_ID = yandex_iam_service_account_static_access_key.sqs_access_key.access_key
       YANDEX_SQS_SECRET_ACCESS_KEY = yandex_iam_service_account_static_access_key.sqs_access_key.secret_key
+      # Static pages bucket configuration
+      STATIC_PAGES_BUCKET_NAME = yandex_storage_bucket.news_site_pages.bucket
+      STATIC_PAGES_ENABLED     = "true"
     }
   }
   
@@ -459,4 +489,23 @@ output "sqs_secret_key" {
   description = "Service Account Secret Key for Message Queue"
   value       = yandex_iam_service_account_static_access_key.sqs_access_key.secret_key
   sensitive   = true
+}
+
+# ============================================
+# Static Pages Bucket Outputs
+# ============================================
+
+output "static_pages_bucket_name" {
+  description = "Static Pages bucket name"
+  value       = yandex_storage_bucket.news_site_pages.bucket
+}
+
+output "static_pages_bucket_url" {
+  description = "Static Pages bucket URL"
+  value       = "https://storage.yandexcloud.net/${yandex_storage_bucket.news_site_pages.bucket}"
+}
+
+output "static_pages_website_url" {
+  description = "Static Pages website endpoint URL"
+  value       = yandex_storage_bucket.news_site_pages.website_endpoint
 }

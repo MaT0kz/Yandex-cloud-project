@@ -32,7 +32,8 @@ db_config = {
 
 # Storage Configuration
 storage_config = {
-  bucket_name          = "news-site-images-bucket"  # Уникальное имя бакета
+  bucket_name          = "news-site-images-bucket"  # Уникальное имя бакета для изображений
+  pages_bucket_name    = "news-site-pages"          # Бакет для статических HTML-страниц
   max_size             = 1073741824  # 1 ГБ в байтах
   cors_allowed_origins = ["*"]       # Для разработки; в продакшене укажите домен
   versioning_enabled   = false

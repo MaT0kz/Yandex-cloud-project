@@ -126,6 +126,61 @@ def create_app(config_name='default'):
             app.logger.error(f'Error deleting image: {e}')
             return False
     
+    # ============ STATIC PAGES FROM S3 ============
+
+    def get_page_from_s3(page_name):
+        """
+        Get page content from S3 bucket.
+        Returns tuple: (content, content_type) or (None, error_message)
+        """
+        if not page_name:
+            return None, 'Page name is required'
+
+        # Add .html extension if not present
+        if not page_name.endswith('.html'):
+            page_name = f'{page_name}.html'
+
+        try:
+            bucket_name = app.config.get('STATIC_PAGES_BUCKET_NAME')
+            s3 = get_s3_client()
+
+            response = s3.get_object(Bucket=bucket_name, Key=page_name)
+            content = response['Body'].read().decode('utf-8')
+            content_type = response.get('ContentType', 'text/html; charset=utf-8')
+
+            return content, content_type
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            if error_code == 'NoSuchKey':
+                return None, f'Page not found: {page_name}'
+            app.logger.error(f'Error getting page {page_name}: {e}')
+            return None, f'Error loading page: {error_code}'
+        except Exception as e:
+            app.logger.error(f'Unexpected error getting page {page_name}: {e}')
+            return None, 'Internal error'
+
+    def serve_page(page_name):
+        """
+        Serve a page from S3 bucket.
+        Falls back to local template if STATIC_PAGES_ENABLED is false.
+        """
+        static_enabled = app.config.get('STATIC_PAGES_ENABLED', False)
+
+        if not static_enabled:
+            # Use local templates
+            return render_template(f'{page_name}.html')
+
+        content, content_type = get_page_from_s3(page_name)
+
+        if content is None:
+            # Page not found in S3, try local templates
+            try:
+                return render_template(f'{page_name}.html')
+            except:
+                return render_template('404.html'), 404
+
+        return content, 200, {'Content-Type': content_type}
+
     # Before request - set current user
     @app.before_request
     def before_request():
@@ -136,9 +191,8 @@ def create_app(config_name='default'):
     # Home page - list all news
     @app.route('/')
     def index():
-        all_news = News.query.order_by(News.created_at.desc()).all()
-        return render_template('index.html', news_list=all_news)
-    
+        return serve_page('index')
+
     # ============ AUTH ROUTES ============
     
     # Register
@@ -173,8 +227,8 @@ def create_app(config_name='default'):
             flash('Регистрация успешна! Теперь вы можете войти.', 'success')
             return redirect(url_for('login'))
         
-        return render_template('register.html')
-    
+        return serve_page('register')
+
     # Login
     @app.route('/login', methods=['GET', 'POST'])
     def login():
@@ -195,8 +249,8 @@ def create_app(config_name='default'):
             flash('Неверное имя пользователя или пароль!', 'error')
             return redirect(url_for('login'))
         
-        return render_template('login.html')
-    
+        return serve_page('login')
+
     # Logout
     @app.route('/logout')
     def logout():
@@ -236,14 +290,14 @@ def create_app(config_name='default'):
             flash('Новость успешно создана!', 'success')
             return redirect(url_for('index'))
         
-        return render_template('create.html')
-    
+        return serve_page('create')
+
     # View single news
     @app.route('/news/<int:news_id>')
     def view_news(news_id):
         news = News.query.get_or_404(news_id)
-        return render_template('view.html', news=news)
-    
+        return serve_page('view')
+
     # Edit news (author only)
     @app.route('/news/<int:news_id>/edit', methods=['GET', 'POST'])
     def edit_news(news_id):
@@ -286,8 +340,8 @@ def create_app(config_name='default'):
             flash('Новость успешно обновлена!', 'success')
             return redirect(url_for('view_news', news_id=news.id))
         
-        return render_template('edit.html', news=news)
-    
+        return serve_page('edit')
+
     # Delete news (author only)
     @app.route('/news/<int:news_id>/delete', methods=['POST'])
     def delete_news(news_id):
@@ -327,17 +381,17 @@ def create_app(config_name='default'):
             return redirect(url_for('login'))
         
         my_news_list = News.query.filter_by(user_id=g.user.id).order_by(News.created_at.desc()).all()
-        return render_template('my_news.html', news_list=my_news_list)
+        return serve_page('my_news')
     
     # Error handlers
     @app.errorhandler(404)
     def not_found_error(error):
-        return render_template('404.html'), 404
-    
+        return serve_page('404')
+
     @app.errorhandler(500)
     def internal_error(error):
         db.session.rollback()
-        return render_template('500.html'), 500
+        return serve_page('500')
     
     # Debug endpoint for checking configuration
     @app.route('/debug/config')

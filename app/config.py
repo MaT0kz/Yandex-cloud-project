@@ -44,6 +44,10 @@ class Config:
     # Static files URL
     STATIC_FILES_URL = os.environ.get('STATIC_FILES_URL') or '/static/uploads'
 
+    # Static pages bucket (for serving HTML templates from Object Storage)
+    STATIC_PAGES_BUCKET_NAME = os.environ.get('STATIC_PAGES_BUCKET_NAME') or 'news-site-pages'
+    STATIC_PAGES_ENABLED = os.environ.get('STATIC_PAGES_ENABLED', 'false').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""

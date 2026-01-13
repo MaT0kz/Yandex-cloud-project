@@ -18,6 +18,9 @@ services:
       - YANDEX_BUCKET_NAME=${YANDEX_BUCKET_NAME:-news-site-storage}
       - YANDEX_ENDPOINT_URL=${YANDEX_ENDPOINT_URL:-https://storage.yandexcloud.net}
       - YANDEX_REGION=${YANDEX_REGION:-ru-central1}
+      # Static pages bucket configuration
+      - STATIC_PAGES_BUCKET_NAME=${STATIC_PAGES_BUCKET_NAME:-news-site-pages}
+      - STATIC_PAGES_ENABLED=${STATIC_PAGES_ENABLED:-false}}
     depends_on:
       db:
         condition: service_healthy

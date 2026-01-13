@@ -57,7 +57,7 @@ variable "db_config" {
     port                   = 6432
     database_name          = "news_db"
     username               = "news_user"
-    password               = ""  # Будет сгенерирован или укажите свой
+    password               = ""  # Будет сгенерирован или укажи те свой
     assign_public_ip       = false
     maintenance_window_type = "WEEKLY"
     maintenance_window_day = "MON"
@@ -70,6 +70,7 @@ variable "storage_config" {
   description = "Object Storage bucket configuration"
   type = object({
     bucket_name          = string
+    pages_bucket_name    = string
     max_size             = number
     cors_allowed_origins = list(string)
     versioning_enabled   = bool
@@ -78,6 +79,7 @@ variable "storage_config" {
   })
   default = {
     bucket_name          = "news-site-images-bucket"
+    pages_bucket_name    = "news-site-pages"
     max_size             = 1073741824  # 1 GB
     cors_allowed_origins = ["*"]  # Для разработки; в продакшене укажите конкретный домен
     versioning_enabled   = false
