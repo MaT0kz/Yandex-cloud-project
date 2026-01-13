@@ -26,8 +26,8 @@ provider "yandex" {
 # ============================================
 
 # Виртуальная сеть
-resource "yandex_vpc_network" "news_site_network" {
-  name      = "${var.project_name}-network"
+resource "yandex_vpc_network" "news_site_network1" {
+  name      = "${var.project_name}-network1"
   folder_id = var.cloud_config.folder_id
 }
 
@@ -37,7 +37,7 @@ resource "yandex_vpc_subnet" "news_site_subnet_a" {
   folder_id      = var.cloud_config.folder_id
   zone           = var.cloud_config.region_zone
   v4_cidr_blocks = ["10.0.0.0/24"]
-  network_id     = yandex_vpc_network.news_site_network.id
+  network_id     = yandex_vpc_network.news_site_network1.id
 }
 
 # ============================================
@@ -50,7 +50,7 @@ resource "yandex_mdb_postgresql_cluster" "news_site_db" {
   folder_id   = var.cloud_config.folder_id
   description = "PostgreSQL cluster for news site"
   environment = var.db_config.environment
-  network_id  = yandex_vpc_network.news_site_network.id
+  network_id  = yandex_vpc_network.news_site_network1.id
   
   config {
     version = var.db_config.postgresql_version
@@ -102,15 +102,26 @@ resource "yandex_mdb_postgresql_user" "news_site_user" {
 # Service Account (используем существующий admin)
 # ============================================
 
-# Статические ключи доступа для сервисного аккаунта (используются для Message Queue)
-resource "yandex_iam_service_account_static_access_key" "sa_access_key" {
+# ============================================
+# Service Account Static Access Keys
+# ============================================
+
+# Статические ключи доступа для Object Storage (S3)
+resource "yandex_iam_service_account_static_access_key" "s3_access_key" {
   service_account_id = var.cloud_config.service_account_id
-  description        = "Static access key for Message Queue"
+  description        = "Static access key for Object Storage (S3)"
 }
-resource "yandex_resourcemanager_folder_iam_member" "sa_storage_admin" {
+  
+resource "yandex_resourcemanager_folder_iam_member" "sa_s3_admin" {
   folder_id = var.cloud_config.folder_id
   role      = "storage.admin"
   member    = "serviceAccount:${var.cloud_config.service_account_id}"
+}
+
+# Статические ключи доступа для Message Queue (SQS)
+resource "yandex_iam_service_account_static_access_key" "sqs_access_key" {
+  service_account_id = var.cloud_config.service_account_id
+  description        = "Static access key for Message Queue"
 }
   
 resource "yandex_resourcemanager_folder_iam_member" "sa_mq_admin" {
@@ -118,7 +129,7 @@ resource "yandex_resourcemanager_folder_iam_member" "sa_mq_admin" {
   role      = "ymq.admin"
   member    = "serviceAccount:${var.cloud_config.service_account_id}"
 }
-
+  
 resource "yandex_resourcemanager_folder_iam_member" "sa_function_invoker" {
   folder_id = var.cloud_config.folder_id
   role      = "functions.functionInvoker"
@@ -182,8 +193,8 @@ resource "yandex_storage_bucket" "news_site_images" {
 # Очередь создаётся в папке, указанной в cloud_config.folder_id
 resource "yandex_message_queue" "image_delete_queue" {
   name       = var.mq_config.queue_name
-  access_key = yandex_iam_service_account_static_access_key.sa_access_key.access_key
-  secret_key = yandex_iam_service_account_static_access_key.sa_access_key.secret_key
+  access_key = yandex_iam_service_account_static_access_key.sqs_access_key.access_key
+  secret_key = yandex_iam_service_account_static_access_key.sqs_access_key.secret_key
 }
 
 # ============================================
@@ -212,6 +223,8 @@ resource "yandex_function" "delete_image_function" {
     YANDEX_BUCKET_NAME  = yandex_storage_bucket.news_site_images.bucket
     YANDEX_ENDPOINT_URL = "https://storage.yandexcloud.net"
     YANDEX_REGION       = var.cloud_config.region
+    AWS_ACCESS_KEY_ID     = yandex_iam_service_account_static_access_key.s3_access_key.access_key
+    AWS_SECRET_ACCESS_KEY = yandex_iam_service_account_static_access_key.s3_access_key.secret_key
   }
 }
 
@@ -245,6 +258,22 @@ resource "yandex_serverless_container" "news_site_container" {
   
   image {
     url = var.container_config.image_url
+    environment = {
+      DB_HOST                 = yandex_mdb_postgresql_cluster.news_site_db.host.0.fqdn
+      DB_PORT                 = var.db_config.port
+      DB_NAME                 = var.db_config.database_name
+      DB_USER                 = var.db_config.username
+      DB_PASSWORD             = var.db_config.password
+      YANDEX_BUCKET_NAME      = yandex_storage_bucket.news_site_images.bucket
+      YANDEX_ENDPOINT_URL     = "https://storage.yandexcloud.net"
+      YANDEX_REGION           = var.cloud_config.region
+      AWS_ACCESS_KEY_ID       = yandex_iam_service_account_static_access_key.s3_access_key.access_key
+      AWS_SECRET_ACCESS_KEY   = yandex_iam_service_account_static_access_key.s3_access_key.secret_key
+      YANDEX_SQS_ENDPOINT_URL = "https://message-queue.api.cloud.yandex.net"
+      YANDEX_SQS_QUEUE_URL    = "https://message-queue.api.cloud.yandex.net/${var.cloud_config.folder_id}/${yandex_message_queue.image_delete_queue.name}"
+      YANDEX_SQS_ACCESS_KEY_ID = yandex_iam_service_account_static_access_key.sqs_access_key.access_key
+      YANDEX_SQS_SECRET_ACCESS_KEY = yandex_iam_service_account_static_access_key.sqs_access_key.secret_key
+    }
   }
   
   memory          = var.container_config.memory
@@ -253,14 +282,12 @@ resource "yandex_serverless_container" "news_site_container" {
   execution_timeout = var.container_config.execution_timeout
   service_account_id = var.cloud_config.service_account_id
   
-  # Разрешить публичный доступ
-  invocation_protocol = "http"
-  visibility {
-    google = true
-    yandex = "all-users"
+  # Подключаем контейнер к VPC сети для доступа к PostgreSQL
+  connectivity {
+    network_id = yandex_vpc_network.news_site_network1.id
   }
 }
-
+  
 # ============================================
 # API Gateway
 # ============================================
@@ -402,7 +429,7 @@ output "api_gateway_domain" {
 }
 
 # ============================================
-# Service Account Static Access Keys (for Message Queue)
+# Service Account Static Access Keys (for S3 and SQS)
 # ============================================
 
 output "service_account_id" {
@@ -410,14 +437,26 @@ output "service_account_id" {
   value       = var.cloud_config.service_account_id
 }
 
-output "service_account_access_key" {
-  description = "Service Account Access Key for Message Queue"
-  value       = yandex_iam_service_account_static_access_key.sa_access_key.access_key
+output "s3_access_key" {
+  description = "Service Account Access Key for Object Storage (S3)"
+  value       = yandex_iam_service_account_static_access_key.s3_access_key.access_key
   sensitive   = true
 }
 
-output "service_account_secret_key" {
+output "s3_secret_key" {
+  description = "Service Account Secret Key for Object Storage (S3)"
+  value       = yandex_iam_service_account_static_access_key.s3_access_key.secret_key
+  sensitive   = true
+}
+
+output "sqs_access_key" {
+  description = "Service Account Access Key for Message Queue"
+  value       = yandex_iam_service_account_static_access_key.sqs_access_key.access_key
+  sensitive   = true
+}
+
+output "sqs_secret_key" {
   description = "Service Account Secret Key for Message Queue"
-  value       = yandex_iam_service_account_static_access_key.sa_access_key.secret_key
+  value       = yandex_iam_service_account_static_access_key.sqs_access_key.secret_key
   sensitive   = true
 }

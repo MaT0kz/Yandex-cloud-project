@@ -39,8 +39,8 @@ def create_app(config_name='default'):
         return boto3.client(
             'sqs',
             endpoint_url=app.config.get('YANDEX_SQS_ENDPOINT_URL'),
-            aws_access_key_id=app.config.get('YANDEX_ACCESS_KEY_ID'),
-            aws_secret_access_key=app.config.get('YANDEX_SECRET_ACCESS_KEY'),
+            aws_access_key_id=app.config.get('YANDEX_SQS_ACCESS_KEY_ID'),
+            aws_secret_access_key=app.config.get('YANDEX_SQS_SECRET_ACCESS_KEY'),
             region_name=app.config.get('YANDEX_REGION')
         )
     
@@ -338,6 +338,25 @@ def create_app(config_name='default'):
     def internal_error(error):
         db.session.rollback()
         return render_template('500.html'), 500
+    
+    # Debug endpoint for checking configuration
+    @app.route('/debug/config')
+    def debug_config():
+        """Debug endpoint to check configuration."""
+        config_status = {
+            'database_configured': bool(app.config.get('SQLALCHEMY_DATABASE_URI')),
+            'database_host': app.config.get('DB_HOST'),
+            'database_name': app.config.get('DB_NAME'),
+            'bucket_name': app.config.get('YANDEX_BUCKET_NAME'),
+            'endpoint_url': app.config.get('YANDEX_ENDPOINT_URL'),
+            'access_key_configured': bool(app.config.get('YANDEX_ACCESS_KEY_ID')),
+            'sqs_queue_url': app.config.get('YANDEX_SQS_QUEUE_URL'),
+        }
+        return {
+            'status': 'ok',
+            'config': config_status,
+            'environment_vars': {k: v[:10] + '...' if len(v) > 10 else v for k, v in os.environ.items() if k.startswith('YANDEX') or k == 'SECRET_KEY'}
+        }
     
     return app
 

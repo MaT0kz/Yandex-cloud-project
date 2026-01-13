@@ -38,6 +38,8 @@ class Config:
     # Yandex Message Queue settings
     YANDEX_SQS_ENDPOINT_URL = os.environ.get('YANDEX_SQS_ENDPOINT_URL') or 'https://message-queue.api.cloud.yandex.net'
     YANDEX_SQS_QUEUE_URL = os.environ.get('YANDEX_SQS_QUEUE_URL') or ''
+    YANDEX_SQS_ACCESS_KEY_ID = os.environ.get('YANDEX_SQS_ACCESS_KEY_ID') or ''
+    YANDEX_SQS_SECRET_ACCESS_KEY = os.environ.get('YANDEX_SQS_SECRET_ACCESS_KEY') or ''
     
     # Static files URL
     STATIC_FILES_URL = os.environ.get('STATIC_FILES_URL') or '/static/uploads'
